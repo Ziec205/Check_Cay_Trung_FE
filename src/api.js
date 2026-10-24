@@ -27,6 +27,7 @@ export const api = {
   deleteMonth: (month) => request(`/api/months/${month}`, { method: 'DELETE' }),
   ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType }), 90000),
   invoiceMonths: () => request('/api/invoices/months'),
+  eggTypes: () => request('/api/invoices/egg-types'),
   invoices: (month) => request(`/api/invoices?month=${month}`),
   createInvoice: (inv) => request('/api/invoices', send('POST', inv)),
   updateInvoice: (id, inv) => request(`/api/invoices/${id}`, send('PUT', inv)),

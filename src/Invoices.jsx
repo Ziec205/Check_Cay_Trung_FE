@@ -1,23 +1,114 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import {
   EGGS_PER_TREE, dateLabel, dateTimeLabel, fmtInt, fmtMoney, monthLabel, nowLocal, weekdayLabel,
 } from './calc.js';
 import NumberInput from './NumberInput.jsx';
 
-function InvoiceForm({ invoice, onSaved, onCancel }) {
+let nextKey = 1;
+const newLine = (l = {}) => ({
+  key: nextKey++,
+  eggType: l.eggType || '',
+  trees: l.trees ? String(l.trees) : '',
+  price: l.pricePerEgg ? String(l.pricePerEgg) : '',
+});
+
+const lineEggs = (l) => Number(l.trees || 0) * EGGS_PER_TREE;
+const lineAmount = (l) => lineEggs(l) * Number(l.price || 0);
+const lineReady = (l) => l.eggType.trim() && Number(l.trees) > 0 && Number(l.price) > 0;
+
+// Một dòng hóa đơn: loại trứng, số cây, đơn giá
+function LineEditor({ line, index, count, eggTypes, onChange, onRemove, autoFocus }) {
+  const typeRef = useRef(null);
+  useEffect(() => { if (autoFocus) typeRef.current?.focus(); }, [autoFocus]);
+  const set = (patch) => onChange({ ...line, ...patch });
+  const n = index + 1;
+
+  return (
+    <fieldset className="line">
+      <legend className="line-legend">
+        <span>{count > 1 ? `Loại trứng thứ ${n}` : 'Loại trứng'}</span>
+        {count > 1 && (
+          <button type="button" className="btn quiet danger line-remove" onClick={onRemove}>
+            Bỏ dòng này
+          </button>
+        )}
+      </legend>
+
+      <label className="field">
+        <span className="sr-only">Tên loại trứng {n}</span>
+        <input
+          ref={typeRef}
+          className="text-input"
+          value={line.eggType}
+          onChange={(e) => set({ eggType: e.target.value })}
+          placeholder="Ví dụ: Trứng gà ta loại 1"
+          list="egg-types"
+          autoComplete="off"
+          enterKeyHint="next"
+          maxLength={60}
+        />
+      </label>
+
+      <div className="field-pair">
+        <label className="field">
+          <span className="field-label">Số cây</span>
+          <span className="affix">
+            <NumberInput
+              className="text-input num-input"
+              value={line.trees}
+              onChange={(trees) => set({ trees })}
+              maxDigits={6}
+              placeholder="10"
+              enterKeyHint="next"
+            />
+            <span className="affix-unit">cây</span>
+          </span>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Đơn giá mỗi quả</span>
+          <span className="affix">
+            <NumberInput
+              className="text-input num-input"
+              value={line.price}
+              onChange={(price) => set({ price })}
+              format={fmtInt}
+              maxDigits={8}
+              placeholder="2,300"
+              enterKeyHint="done"
+            />
+            <span className="affix-unit">VND</span>
+          </span>
+        </label>
+      </div>
+
+      <p className="line-sum">
+        <span>{fmtInt(line.trees)} cây × {EGGS_PER_TREE} = {fmtInt(lineEggs(line))} quả</span>
+        <strong>{fmtMoney(lineAmount(line))}</strong>
+      </p>
+    </fieldset>
+  );
+}
+
+function InvoiceForm({ invoice, eggTypes, onSaved, onCancel }) {
   const [customer, setCustomer] = useState(invoice?.customer || '');
-  const [trees, setTrees] = useState(invoice ? String(invoice.trees) : '');
-  const [price, setPrice] = useState(invoice ? String(invoice.pricePerEgg) : '');
+  const [lines, setLines] = useState(() => (invoice ? invoice.lines.map(newLine) : [newLine()]));
+  const [focusKey, setFocusKey] = useState(null);
   const [issuedAt, setIssuedAt] = useState(invoice?.issuedAt || nowLocal());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const t = Number(trees || 0);
-  const p = Number(price || 0);
-  const eggs = t * EGGS_PER_TREE;
-  const total = eggs * p;
-  const canSave = customer.trim() && t > 0 && p > 0 && issuedAt && !saving;
+  const trees = lines.reduce((s, l) => s + Number(l.trees || 0), 0);
+  const eggs = lines.reduce((s, l) => s + lineEggs(l), 0);
+  const total = lines.reduce((s, l) => s + lineAmount(l), 0);
+  const canSave = customer.trim() && issuedAt && lines.every(lineReady) && !saving;
+
+  const addLine = () => {
+    const l = newLine();
+    setLines((ls) => [...ls, l]);
+    setFocusKey(l.key);
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -25,7 +116,11 @@ function InvoiceForm({ invoice, onSaved, onCancel }) {
     setSaving(true);
     setError('');
     try {
-      const body = { customer: customer.trim(), trees: t, pricePerEgg: p, issuedAt };
+      const body = {
+        customer: customer.trim(),
+        issuedAt,
+        lines: lines.map((l) => ({ eggType: l.eggType.trim(), trees: Number(l.trees), pricePerEgg: Number(l.price) })),
+      };
       const saved = invoice ? await api.updateInvoice(invoice.id, body) : await api.createInvoice(body);
       onSaved(saved);
     } catch (err) {
@@ -52,39 +147,6 @@ function InvoiceForm({ invoice, onSaved, onCancel }) {
         />
       </label>
 
-      <div className="field-pair">
-        <label className="field">
-          <span className="field-label">Số cây trứng</span>
-          <span className="affix">
-            <NumberInput
-              className="text-input num-input"
-              value={trees}
-              onChange={setTrees}
-              maxDigits={6}
-              placeholder="10"
-              enterKeyHint="next"
-            />
-            <span className="affix-unit">cây</span>
-          </span>
-        </label>
-
-        <label className="field">
-          <span className="field-label">Đơn giá mỗi quả</span>
-          <span className="affix">
-            <NumberInput
-              className="text-input num-input"
-              value={price}
-              onChange={setPrice}
-              format={fmtInt}
-              maxDigits={8}
-              placeholder="2,300"
-              enterKeyHint="done"
-            />
-            <span className="affix-unit">VND</span>
-          </span>
-        </label>
-      </div>
-
       <div className="field">
         <label className="field-label" htmlFor="issued-at">Ngày giờ xuất hóa đơn</label>
         <div className="datetime-row">
@@ -99,13 +161,34 @@ function InvoiceForm({ invoice, onSaved, onCancel }) {
         </div>
       </div>
 
+      <datalist id="egg-types">
+        {eggTypes.map((t) => <option key={t} value={t} />)}
+      </datalist>
+
+      <div className="lines">
+        {lines.map((l, i) => (
+          <LineEditor
+            key={l.key}
+            line={l}
+            index={i}
+            count={lines.length}
+            eggTypes={eggTypes}
+            autoFocus={l.key === focusKey}
+            onChange={(nl) => setLines((ls) => ls.map((x) => (x.key === l.key ? nl : x)))}
+            onRemove={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+          />
+        ))}
+        <button type="button" className="btn add-line" onClick={addLine}>+ Thêm loại trứng</button>
+      </div>
+
       <section className="calc" aria-live="polite" aria-label="Thành tiền">
         <p className="calc-line">
-          <span>{fmtInt(t)} cây × {EGGS_PER_TREE} quả</span>
-          <span>{fmtInt(eggs)} quả</span>
+          <span>Tổng số cây</span>
+          <span>{fmtInt(trees)} cây</span>
         </p>
         <p className="calc-line">
-          <span>{fmtInt(eggs)} quả × {fmtMoney(p)}</span>
+          <span>Tổng số trứng</span>
+          <span>{fmtInt(eggs)} quả</span>
         </p>
         <p className="calc-total">{fmtMoney(total)}</p>
       </section>
@@ -137,14 +220,24 @@ function Receipt({ inv, onEdit, onNew, onBack, onDelete }) {
           <div><dt>Ngày giờ</dt><dd>{weekdayLabel(date)}, {dateTimeLabel(inv.issuedAt)}</dd></div>
         </dl>
 
+        <ul className="receipt-items">
+          {inv.lines.map((l, i) => (
+            <li key={i} className="receipt-item">
+              <div className="receipt-item-head">
+                <span className="receipt-item-name">{l.eggType || 'Trứng'}</span>
+                <strong>{fmtMoney(l.amount)}</strong>
+              </div>
+              <p className="receipt-item-calc">
+                {fmtInt(l.trees)} cây × {inv.eggsPerTree} = {fmtInt(l.eggs)} quả × {fmtMoney(l.pricePerEgg)}
+              </p>
+            </li>
+          ))}
+        </ul>
+
         <table className="receipt-lines">
           <tbody>
-            <tr><th scope="row">Số cây trứng</th><td>{fmtInt(inv.trees)} cây</td></tr>
-            <tr>
-              <th scope="row">Tổng số trứng</th>
-              <td>{fmtInt(inv.eggs)} quả<span className="receipt-note">{fmtInt(inv.trees)} × {inv.eggsPerTree} quả</span></td>
-            </tr>
-            <tr><th scope="row">Đơn giá</th><td>{fmtMoney(inv.pricePerEgg)} / quả</td></tr>
+            <tr><th scope="row">Tổng số cây</th><td>{fmtInt(inv.trees)} cây</td></tr>
+            <tr><th scope="row">Tổng số trứng</th><td>{fmtInt(inv.eggs)} quả</td></tr>
           </tbody>
         </table>
 
@@ -210,17 +303,21 @@ function InvoiceList({ refreshKey, month, setMonth, onOpen }) {
       )}
 
       <ul className="invoice-rows">
-        {list.map((inv) => (
-          <li key={inv.id}>
-            <button className="invoice-row" onClick={() => onOpen(inv)}>
-              <span className="invoice-row-main">
-                <span className="invoice-customer">{inv.customer}</span>
-                <span className="invoice-when">{dateTimeLabel(inv.issuedAt)}, {fmtInt(inv.trees)} cây</span>
-              </span>
-              <span className="invoice-amount">{fmtMoney(inv.total)}</span>
-            </button>
-          </li>
-        ))}
+        {list.map((inv) => {
+          const types = inv.lines.map((l) => l.eggType).filter(Boolean).join(', ');
+          return (
+            <li key={inv.id}>
+              <button className="invoice-row" onClick={() => onOpen(inv)}>
+                <span className="invoice-row-main">
+                  <span className="invoice-customer">{inv.customer}</span>
+                  <span className="invoice-when">{dateTimeLabel(inv.issuedAt)}, {fmtInt(inv.trees)} cây</span>
+                  {types && <span className="invoice-types">{types}</span>}
+                </span>
+                <span className="invoice-amount">{fmtMoney(inv.total)}</span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -232,6 +329,11 @@ export default function Invoices() {
   const [formKey, setFormKey] = useState(0);
   const [month, setMonth] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [eggTypes, setEggTypes] = useState([]);
+
+  useEffect(() => {
+    api.eggTypes().then(setEggTypes).catch(() => {});
+  }, [refreshKey]);
 
   const show = (inv) => {
     setViewing(inv);
@@ -266,6 +368,7 @@ export default function Invoices() {
       <InvoiceForm
         key={editing?.id || `new-${formKey}`}
         invoice={editing}
+        eggTypes={eggTypes}
         onSaved={(inv) => {
           setEditing(null);
           setFormKey((k) => k + 1);
