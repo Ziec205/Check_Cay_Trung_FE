@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import { dateLabel, fmt1, monthLabel } from './calc.js';
+import { dateLabel, fmt1, monthLabel, weekdayLabel } from './calc.js';
 import Entry from './Entry.jsx';
+import Weights from './Weights.jsx';
 
 export default function History({ month, setMonth, refreshKey, onChanged }) {
-  const [months, setMonths] = useState([]);
+  const [months, setMonths] = useState(null);
   const [slips, setSlips] = useState([]);
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
@@ -39,31 +40,42 @@ export default function History({ month, setMonth, refreshKey, onChanged }) {
 
   return (
     <>
-      <div className="row between">
-        <h2>Các lần nhập</h2>
-        {months.length > 0 && (
-          <select value={month || ''} onChange={(e) => setMonth(e.target.value)}>
-            {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
-          </select>
+      <div className="section-head">
+        <h2 className="page-title">Các lần nhập</h2>
+        {months?.length > 0 && (
+          <label className="month-pick">
+            <span className="sr-only">Chọn tháng</span>
+            <select value={month || ''} onChange={(e) => setMonth(e.target.value)}>
+              {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </label>
         )}
       </div>
-      {error && <div className="notice error">{error}</div>}
-      {months.length === 0 && !error && <p className="muted">Chưa có số liệu.</p>}
-      <ul className="slips">
+
+      {error && <p className="notice error" role="alert">{error}</p>}
+      {months === null && !error && <p className="loading">Đang tải số liệu...</p>}
+      {months?.length === 0 && <p className="muted">Chưa có lần nhập nào. Các lần nhập sẽ hiện ở đây sau khi bạn lưu.</p>}
+
+      <ol className="slips">
         {slips.map((s) => (
-          <li key={s.id} className="card">
-            <div className="row between">
-              <b>{dateLabel(s.date)}</b>
-              <span>{s.count} cây · dư {fmt1(s.remKg)} kg</span>
+          <li key={s.id} className="slip">
+            <div className="slip-head">
+              <h3 className="slip-date">
+                {weekdayLabel(s.date)}, {dateLabel(s.date)}
+              </h3>
+              <p className="slip-tally">
+                <strong>{s.count} cây</strong>
+                <span className="rem">còn {fmt1(s.remKg)} kg</span>
+              </p>
             </div>
-            <p className="nums">{s.values.join(' ')}</p>
-            <div className="row">
-              <button onClick={() => setEditing(s)}>Sửa</button>
-              <button className="danger" onClick={() => remove(s)}>Xóa</button>
+            <Weights values={s.values} />
+            <div className="actions">
+              <button className="btn" onClick={() => setEditing(s)}>Sửa</button>
+              <button className="btn quiet danger" onClick={() => remove(s)}>Xóa</button>
             </div>
           </li>
         ))}
-      </ul>
+      </ol>
     </>
   );
 }

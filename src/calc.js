@@ -24,6 +24,8 @@ export function parseNumbers(text) {
   return { values, invalid };
 }
 
+export const fmt0 = (n) => n.toLocaleString('vi-VN');
+
 export const fmt1 = (n) => n.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export function monthLabel(m) {
@@ -37,3 +39,9 @@ export const dateLabel = (d) => d.split('-').reverse().join('/');
 
 // Số lạ so với dải thường gặp, để nhắc kiểm tra lại.
 export const isOdd = (v) => v < 150 || v > 299;
+
+export function weekdayLabel(d) {
+  const [y, m, day] = d.split('-').map(Number);
+  const w = new Date(y, m - 1, day).toLocaleDateString('vi-VN', { weekday: 'long' });
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}

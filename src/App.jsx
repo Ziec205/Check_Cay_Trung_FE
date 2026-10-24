@@ -4,7 +4,7 @@ import Entry from './Entry.jsx';
 import History from './History.jsx';
 
 const TABS = [
-  ['home', 'Trang chủ'],
+  ['home', 'Tổng hợp'],
   ['entry', 'Nhập số liệu'],
   ['history', 'Các lần nhập'],
 ];
@@ -17,11 +17,18 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>🥚 Sổ trứng</h1>
-        <nav>
+      <header className="masthead">
+        <h1 className="wordmark">Sổ trứng</h1>
+        <nav className="tabs" aria-label="Chuyển trang">
           {TABS.map(([id, label]) => (
-            <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
+            <button
+              key={id}
+              className="tab"
+              aria-current={tab === id ? 'page' : undefined}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
           ))}
         </nav>
       </header>
@@ -30,6 +37,7 @@ export default function App() {
           <Home
             refreshKey={refreshKey}
             onOpenMonth={(m) => { setMonth(m); setTab('history'); }}
+            onNewEntry={() => setTab('entry')}
           />
         )}
         {tab === 'entry' && <Entry onSaved={refresh} />}

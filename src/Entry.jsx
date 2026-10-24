@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
 import { dateLabel, fmt1, isOdd, parseNumbers, summarize, todayStr } from './calc.js';
-import Summary from './Summary.jsx';
+import Breakdown from './Breakdown.jsx';
+import Weights from './Weights.jsx';
 
 // Thu nhỏ ảnh để tải nhanh và đỡ tốn quota Gemini.
 function resizeImage(file, max = 1600) {
@@ -45,7 +46,7 @@ export default function Entry({ slip, onSaved, onCancel }) {
 
   const { values, invalid } = useMemo(() => parseNumbers(text), [text]);
   const summary = useMemo(() => summarize(values), [values]);
-  const odd = values.filter(isOdd);
+  const oddCount = values.filter(isOdd).length;
 
   const readImage = async (file) => {
     if (!file) return;
@@ -56,10 +57,10 @@ export default function Entry({ slip, onSaved, onCancel }) {
       const { values: found, raw: answer } = await api.ocr(image, 'image/jpeg');
       setRaw(answer);
       if (found.length === 0) {
-        setMessage({ type: 'error', text: 'Không lọc được số nào từ câu trả lời của AI (xem bên dưới). Hãy chụp rõ hơn hoặc nhập tay.' });
+        setMessage({ type: 'error', text: 'Không lọc được số nào từ câu trả lời của AI. Hãy chụp rõ hơn hoặc gõ tay.' });
       } else {
         setText((old) => (old.trim() ? `${old.trim()} ${found.join(' ')}` : found.join(' ')));
-        setMessage({ type: 'ok', text: `Lọc được ${found.length} số. Hãy đối chiếu với ảnh và sửa nếu cần trước khi lưu.` });
+        setMessage({ type: 'ok', text: `Đã điền ${found.length} số từ ảnh. Đối chiếu với sổ và sửa nếu cần trước khi lưu.` });
       }
     } catch (e) {
       setMessage({ type: 'error', text: e.message });
@@ -75,6 +76,7 @@ export default function Entry({ slip, onSaved, onCancel }) {
       if (slip) await api.updateSlip(slip.id, { date, values });
       else await api.createSlip({ date, values });
       setText('');
+      setRaw('');
       setMessage({ type: 'ok', text: `Đã lưu ${values.length} cây cho ngày ${dateLabel(date)}.` });
       onSaved?.();
     } catch (e) {
@@ -87,66 +89,81 @@ export default function Entry({ slip, onSaved, onCancel }) {
 
   return (
     <div className="entry">
-      <h2>{slip ? 'Sửa lần nhập' : 'Nhập số liệu'}</h2>
+      <h2 className="page-title">{slip ? `Sửa lần nhập ngày ${dateLabel(slip.date)}` : 'Nhập số liệu'}</h2>
 
-      <label className="field">
-        Ngày
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </label>
+      <div className="entry-top">
+        <label className="field">
+          <span className="field-label">Ngày cân</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
 
-      <div className="field">
-        Ảnh sổ (AI đọc số)
-        <div className="row">
+        <div className="field">
+          <span className="field-label">Đọc từ ảnh sổ</span>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => readImage(e.target.files?.[0])} />
-          <button disabled={reading} onClick={() => fileRef.current?.click()}>
+          <button className="btn" disabled={reading} onClick={() => fileRef.current?.click()}>
             {reading ? 'AI đang đọc ảnh...' : 'Chụp hoặc chọn ảnh'}
           </button>
         </div>
+
+        <label className="field">
+          <span className="field-label">Thêm từng số</span>
+          <input
+            className="single"
+            inputMode="numeric"
+            maxLength={3}
+            placeholder="201"
+            value={single}
+            onChange={onSingle}
+            aria-describedby="single-hint"
+          />
+          <span id="single-hint" className="hint">Gõ đủ 3 chữ số là tự thêm vào trang.</span>
+        </label>
       </div>
 
       <label className="field">
-        Nhập tay từng số (gõ đủ 3 chữ số là tự thêm)
-        <input
-          className="single"
-          inputMode="numeric"
-          maxLength={3}
-          placeholder="201"
-          value={single}
-          onChange={onSingle}
+        <span className="field-label">Các số cân</span>
+        <textarea
+          className="notebook paper margin"
+          rows={5}
+          value={text}
+          placeholder="201 206 193"
+          onChange={(e) => setText(e.target.value)}
+          aria-describedby="text-hint"
         />
+        <span id="text-hint" className="hint">Mỗi số gồm 3 chữ số, cách nhau bằng dấu cách hoặc xuống dòng. 201 nghĩa là 20,1 kg.</span>
       </label>
 
-      <label className="field">
-        Các số (mỗi số 3 chữ số, cách nhau bằng dấu cách hoặc xuống dòng)
-        <textarea
-          rows={6}
-          value={text}
-          placeholder="201 206 193 ..."
-          onChange={(e) => setText(e.target.value)}
-        />
-      </label>
+      <div aria-live="polite">
+        {message && <p className={`notice ${message.type}`}>{message.text}</p>}
+        {invalid.length > 0 && <p className="notice error">Các số này không đủ 3 chữ số, hãy sửa lại: {invalid.join(', ')}</p>}
+      </div>
 
       {raw && (
-        <details className="raw" open>
-          <summary>Câu trả lời của AI (đầy đủ)</summary>
+        <details className="raw">
+          <summary>Xem nguyên văn AI chép từ ảnh</summary>
           <pre>{raw}</pre>
         </details>
       )}
 
-      {message && <div className={`notice ${message.type}`}>{message.text}</div>}
-      {invalid.length > 0 && <div className="notice error">Sai định dạng (phải đúng 3 chữ số): {invalid.join(', ')}</div>}
-      {odd.length > 0 && <div className="notice warn">Số bất thường, hãy kiểm tra lại: {odd.join(', ')}</div>}
-
       {values.length > 0 && (
-        <div className="preview">
-          <h3>Xem trước: {summary.count} cây · dư {fmt1(summary.remKg)} kg</h3>
-          <Summary s={summary} />
-        </div>
+        <section className="sheet preview" aria-labelledby="preview-title">
+          <h3 id="preview-title" className="preview-title">
+            <span className="tally-count small">{summary.count}</span> cây
+            <span className="tally-rem inline">còn {fmt1(summary.remKg)} kg</span>
+          </h3>
+          {oddCount > 0 && (
+            <p className="notice warn">Có {oddCount} số nằm ngoài khoảng thường gặp, đã gạch chân để bạn kiểm tra.</p>
+          )}
+          <Weights values={values} />
+          <Breakdown s={summary} />
+        </section>
       )}
 
-      <div className="row">
-        <button className="primary" disabled={!canSave} onClick={save}>{saving ? 'Đang lưu...' : 'Lưu'}</button>
-        {onCancel && <button onClick={onCancel}>Hủy</button>}
+      <div className="savebar">
+        <button className="btn primary" disabled={!canSave} onClick={save}>
+          {saving ? 'Đang lưu...' : slip ? 'Lưu thay đổi' : 'Lưu lần nhập'}
+        </button>
+        {onCancel && <button className="btn quiet" onClick={onCancel}>Hủy</button>}
       </div>
     </div>
   );
