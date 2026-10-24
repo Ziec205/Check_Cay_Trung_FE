@@ -25,6 +25,6 @@ export const api = {
   updateSlip: (id, slip) => request(`/api/slips/${id}`, send('PUT', slip)),
   deleteSlip: (id) => request(`/api/slips/${id}`, { method: 'DELETE' }),
   deleteMonth: (month) => request(`/api/months/${month}`, { method: 'DELETE' }),
-  ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType }), 70000),
+  ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType }), 90000),
   exportUrl: (month) => `${BASE}/api/export${month ? `?month=${month}` : ''}`,
 };
