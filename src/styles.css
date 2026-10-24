@@ -14,6 +14,7 @@
   --line: #d3dbea;
 
   --cell: 32px;
+  --tabbar: 56px;
   --radius: 6px;
   --font: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
@@ -44,14 +45,20 @@ body {
   color: var(--text);
   font: 400 16px/1.55 var(--font);
   font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
 }
+button, a, input, select, textarea, summary { touch-action: manipulation; }
 h1, h2, h3, p, dl, dd, ol { margin: 0; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
 }
 
-.app { max-width: 840px; margin: 0 auto; padding: 0 16px 96px; }
+/* Chừa vùng tai thỏ và thanh Home trên iPhone */
+.app {
+  max-width: 840px; margin: 0 auto;
+  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
 main { display: grid; gap: 32px; }
 
 /* Đầu trang */
@@ -173,13 +180,14 @@ main { display: grid; gap: 32px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.95rem; font-weight: 600; }
 .hint { font-size: 0.875rem; color: var(--muted); }
-input[type='date'], input.single, select {
+/* Chữ trong ô nhập luôn từ 16px trở lên để iPhone không tự phóng to */
+input[type='date'], input.single, select, .text-input {
   font: 500 1rem var(--font); color: var(--text);
-  min-height: 44px; padding: 0 12px;
+  min-height: 48px; padding: 0 12px; -webkit-appearance: none; appearance: none;
   background: var(--paper); border: 1.5px solid var(--grid-strong); border-radius: var(--radius);
 }
 input.single { font-size: 1.25rem; font-weight: 600; color: var(--ink); width: 100%; letter-spacing: 0.08em; }
-input[type='date']:focus, input.single:focus, select:focus, .notebook:focus { border-color: var(--ink); }
+.text-input:focus, input[type='date']:focus, input.single:focus, select:focus, .notebook:focus { border-color: var(--ink); }
 
 /* Ô gõ số: chữ ngồi đúng trên dòng kẻ ô ly */
 textarea.notebook {
@@ -242,8 +250,21 @@ textarea.notebook::placeholder { color: var(--grid-strong); }
 
 @media (max-width: 640px) {
   .masthead { padding: 16px 0 20px; }
-  .tabs { width: 100%; margin: 0 -4px; }
-  .tab { flex: 1; padding-inline: 6px; }
+  /* Thanh chuyển trang nằm dưới đáy, gần ngón cái */
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    gap: 0; overflow: visible;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    border-top: 1px solid var(--line);
+  }
+  .tab {
+    flex: 1; min-height: var(--tabbar); padding: 0 4px;
+    font-size: 0.9375rem; border-bottom: 0; border-top: 3px solid transparent;
+  }
+  .tab[aria-current='page'] { border-top-color: var(--ink); }
+  .savebar { bottom: calc(var(--tabbar) + env(safe-area-inset-bottom)); }
   .sheet { padding: 20px 16px 24px 52px; }
   .paper.margin { background-position: -8px 0, 0 0, 0 0, 0 0; }
   textarea.notebook { padding-left: 48px; }
@@ -262,6 +283,89 @@ textarea.notebook::placeholder { color: var(--grid-strong); }
   .savebar .btn.primary { flex: 1; }
 }
 
+/* Tính tiền */
+.invoice-form { display: grid; gap: 20px; }
+.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.text-input { width: 100%; font-size: 1.0625rem; }
+.text-input::placeholder { color: var(--muted); opacity: 0.5; font-weight: 400; }
+.affix { position: relative; display: block; }
+.affix .num-input { padding-right: 56px; font-size: 1.25rem; font-weight: 600; color: var(--ink); }
+.affix-unit {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-weight: 500; pointer-events: none;
+}
+.datetime-row { display: flex; gap: 8px; }
+.datetime-row .text-input { flex: 1; min-width: 0; }
+input[type='datetime-local']::-webkit-date-and-time-value { text-align: left; }
+
+.calc {
+  background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--ink);
+  border-radius: var(--radius); padding: 16px 20px;
+}
+.calc-line { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
+.calc-line + .calc-line { margin-top: 2px; }
+.calc-total {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--grid-strong);
+  font-size: clamp(1.75rem, 8vw, 2.5rem); font-weight: 800; letter-spacing: -0.02em; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.invoice-list { display: grid; gap: 12px; }
+.month-total { color: var(--muted); }
+.month-total strong { color: var(--ink); }
+.invoice-rows { list-style: none; padding: 0; margin: 0; border-top: 2px solid var(--text); }
+.invoice-rows li { border-bottom: 1px solid var(--line); }
+.invoice-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 64px; padding: 12px 8px; text-align: left;
+  font: inherit; color: inherit; background: none; border: 0; cursor: pointer;
+}
+.invoice-row:hover, .invoice-row:active { background: var(--paper); }
+.invoice-row-main { display: grid; min-width: 0; }
+.invoice-customer { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invoice-when { font-size: 0.875rem; color: var(--muted); }
+.invoice-amount { font-weight: 600; color: var(--ink); white-space: nowrap; }
+
+/* Hóa đơn */
+.receipt-page { display: grid; gap: 4px; }
+.receipt {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
+  padding: 32px 36px; max-width: 560px; width: 100%;
+  box-shadow: 0 12px 24px -18px rgba(26, 34, 72, 0.35);
+}
+.receipt-head { padding-bottom: 16px; border-bottom: 2px solid var(--text); }
+.receipt-head h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.015em; color: var(--ink); }
+.receipt-no { color: var(--muted); margin-top: 2px; }
+.receipt-meta { display: grid; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.receipt-meta dt { font-size: 0.875rem; color: var(--muted); }
+.receipt-meta dd { font-size: 1.0625rem; font-weight: 600; }
+.receipt-lines { width: 100%; border-collapse: collapse; }
+.receipt-lines th, .receipt-lines td { padding: 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.receipt-lines th { text-align: left; font-weight: 500; color: var(--muted); }
+.receipt-lines td { text-align: right; font-weight: 600; }
+.receipt-note { display: block; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
+.receipt-total {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px;
+  padding-top: 16px;
+}
+.receipt-total span { font-weight: 600; }
+.receipt-total strong { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.receipt-actions { margin-top: 20px; }
+.receipt-actions.secondary { margin-top: 4px; }
+
+@media print {
+  body { background: #fff; color: #000; }
+  .masthead, .receipt-actions, .tabs { display: none !important; }
+  .app { padding: 0; }
+  .receipt { border: 0; box-shadow: none; max-width: none; padding: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+@media (max-width: 640px) {
+  .field-pair { grid-template-columns: 1fr; }
+  .receipt { padding: 24px 20px; }
+  .receipt-total strong { font-size: 1.75rem; }
 }

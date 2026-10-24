@@ -45,3 +45,21 @@ export function weekdayLabel(d) {
   const w = new Date(y, m - 1, day).toLocaleDateString('vi-VN', { weekday: 'long' });
   return w.charAt(0).toUpperCase() + w.slice(1);
 }
+
+// Tiền và số lượng trong hóa đơn dùng dấu phẩy ngăn hàng nghìn: 2,300 VND
+export const fmtInt = (n) => Number(n || 0).toLocaleString('en-US');
+export const fmtMoney = (n) => `${fmtInt(n)} VND`;
+
+export const EGGS_PER_TREE = 300;
+
+// Giờ hiện tại dạng "YYYY-MM-DDTHH:mm" cho ô chọn ngày giờ
+export function nowLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+export function dateTimeLabel(s) {
+  const [date, time] = s.split('T');
+  return `${time}, ${dateLabel(date)}`;
+}

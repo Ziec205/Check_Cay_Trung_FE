@@ -2,11 +2,12 @@ import { useState } from 'react';
 import Home from './Home.jsx';
 import Entry from './Entry.jsx';
 import History from './History.jsx';
+import Invoices from './Invoices.jsx';
 
 const TABS = [
   ['home', 'Tổng hợp'],
   ['entry', 'Nhập số liệu'],
-  ['history', 'Các lần nhập'],
+  ['invoice', 'Tính tiền'],
 ];
 
 export default function App() {
@@ -24,8 +25,8 @@ export default function App() {
             <button
               key={id}
               className="tab"
-              aria-current={tab === id ? 'page' : undefined}
-              onClick={() => setTab(id)}
+              aria-current={tab === id || (id === 'home' && tab === 'history') ? 'page' : undefined}
+              onClick={() => { setTab(id); window.scrollTo(0, 0); }}
             >
               {label}
             </button>
@@ -41,6 +42,7 @@ export default function App() {
           />
         )}
         {tab === 'entry' && <Entry onSaved={refresh} />}
+        {tab === 'invoice' && <Invoices />}
         {tab === 'history' && (
           <History month={month} setMonth={setMonth} refreshKey={refreshKey} onChanged={refresh} />
         )}

@@ -26,5 +26,10 @@ export const api = {
   deleteSlip: (id) => request(`/api/slips/${id}`, { method: 'DELETE' }),
   deleteMonth: (month) => request(`/api/months/${month}`, { method: 'DELETE' }),
   ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType }), 90000),
+  invoiceMonths: () => request('/api/invoices/months'),
+  invoices: (month) => request(`/api/invoices?month=${month}`),
+  createInvoice: (inv) => request('/api/invoices', send('POST', inv)),
+  updateInvoice: (id, inv) => request(`/api/invoices/${id}`, send('PUT', inv)),
+  deleteInvoice: (id) => request(`/api/invoices/${id}`, { method: 'DELETE' }),
   exportUrl: (month) => `${BASE}/api/export${month ? `?month=${month}` : ''}`,
 };
