@@ -1,10 +1,11 @@
 const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
 
-async function request(path, options = {}) {
+async function request(path, options = {}, timeoutMs = 30000) {
   let res;
   try {
     res = await fetch(BASE + path, {
       ...options,
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { 'Content-Type': 'application/json' },
     });
   } catch {
@@ -24,6 +25,6 @@ export const api = {
   updateSlip: (id, slip) => request(`/api/slips/${id}`, send('PUT', slip)),
   deleteSlip: (id) => request(`/api/slips/${id}`, { method: 'DELETE' }),
   deleteMonth: (month) => request(`/api/months/${month}`, { method: 'DELETE' }),
-  ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType })),
+  ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType }), 70000),
   exportUrl: (month) => `${BASE}/api/export${month ? `?month=${month}` : ''}`,
 };
