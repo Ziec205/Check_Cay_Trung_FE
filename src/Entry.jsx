@@ -3,6 +3,7 @@ import { api } from './api.js';
 import { dateLabel, fmt1, isOdd, parseNumbers, summarize, todayStr } from './calc.js';
 import Breakdown from './Breakdown.jsx';
 import Weights from './Weights.jsx';
+import NumberInput from './NumberInput.jsx';
 
 // Thu nhỏ ảnh để tải nhanh và đỡ tốn quota Gemini.
 function resizeImage(file, max = 1600) {
@@ -34,8 +35,7 @@ export default function Entry({ slip, onSaved, onCancel }) {
   const fileRef = useRef(null);
 
   // Nhập tay từng số: đủ 3 chữ số thì tự thêm vào danh sách.
-  const onSingle = (e) => {
-    const v = e.target.value.replace(/\D/g, '').slice(0, 3);
+  const onSingle = (v) => {
     if (v.length === 3) {
       setText((old) => (old.trim() ? `${old.trim()} ${v}` : v));
       setSingle('');
@@ -107,10 +107,9 @@ export default function Entry({ slip, onSaved, onCancel }) {
 
         <label className="field">
           <span className="field-label">Thêm từng số</span>
-          <input
+          <NumberInput
             className="single"
-            inputMode="numeric"
-            maxLength={3}
+            maxDigits={3}
             placeholder="201"
             value={single}
             onChange={onSingle}
@@ -129,6 +128,10 @@ export default function Entry({ slip, onSaved, onCancel }) {
           placeholder="201 206 193"
           onChange={(e) => setText(e.target.value)}
           aria-describedby="text-hint"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
         />
         <span id="text-hint" className="hint">Mỗi số gồm 3 chữ số, cách nhau bằng dấu cách hoặc xuống dòng. 201 nghĩa là 20,1 kg.</span>
       </label>

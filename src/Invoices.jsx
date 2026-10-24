@@ -3,8 +3,7 @@ import { api } from './api.js';
 import {
   EGGS_PER_TREE, dateLabel, dateTimeLabel, fmtInt, fmtMoney, monthLabel, nowLocal, weekdayLabel,
 } from './calc.js';
-
-const digits = (s) => s.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+import NumberInput from './NumberInput.jsx';
 
 function InvoiceForm({ invoice, onSaved, onCancel }) {
   const [customer, setCustomer] = useState(invoice?.customer || '');
@@ -57,12 +56,11 @@ function InvoiceForm({ invoice, onSaved, onCancel }) {
         <label className="field">
           <span className="field-label">Số cây trứng</span>
           <span className="affix">
-            <input
+            <NumberInput
               className="text-input num-input"
-              inputMode="numeric"
-              pattern="[0-9]*"
               value={trees}
-              onChange={(e) => setTrees(digits(e.target.value).slice(0, 6))}
+              onChange={setTrees}
+              maxDigits={6}
               placeholder="10"
               enterKeyHint="next"
             />
@@ -73,12 +71,12 @@ function InvoiceForm({ invoice, onSaved, onCancel }) {
         <label className="field">
           <span className="field-label">Đơn giá mỗi quả</span>
           <span className="affix">
-            <input
+            <NumberInput
               className="text-input num-input"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={price ? fmtInt(price) : ''}
-              onChange={(e) => setPrice(digits(e.target.value).slice(0, 8))}
+              value={price}
+              onChange={setPrice}
+              format={fmtInt}
+              maxDigits={8}
               placeholder="2,300"
               enterKeyHint="done"
             />
