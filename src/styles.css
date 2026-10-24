@@ -62,6 +62,10 @@ select, input[type='date'], textarea {
   background: var(--card);
 }
 textarea { width: 100%; resize: vertical; }
+input.single { width: 120px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 1.1rem; }
+.raw { margin: 12px 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.raw summary { cursor: pointer; font-weight: 500; }
+.raw pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; font: inherit; color: var(--muted); max-height: 260px; overflow: auto; }
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 .row.between { justify-content: space-between; margin-top: 0; }

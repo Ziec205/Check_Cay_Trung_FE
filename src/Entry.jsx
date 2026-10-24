@@ -28,7 +28,20 @@ export default function Entry({ slip, onSaved, onCancel }) {
   const [reading, setReading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [raw, setRaw] = useState('');
+  const [single, setSingle] = useState('');
   const fileRef = useRef(null);
+
+  // Nhập tay từng số: đủ 3 chữ số thì tự thêm vào danh sách.
+  const onSingle = (e) => {
+    const v = e.target.value.replace(/\D/g, '').slice(0, 3);
+    if (v.length === 3) {
+      setText((old) => (old.trim() ? `${old.trim()} ${v}` : v));
+      setSingle('');
+    } else {
+      setSingle(v);
+    }
+  };
 
   const { values, invalid } = useMemo(() => parseNumbers(text), [text]);
   const summary = useMemo(() => summarize(values), [values]);
@@ -40,10 +53,14 @@ export default function Entry({ slip, onSaved, onCancel }) {
     setMessage(null);
     try {
       const image = await resizeImage(file);
-      const { values: found } = await api.ocr(image, 'image/jpeg');
-      if (found.length === 0) throw new Error('AI không đọc được số nào, hãy chụp rõ hơn');
-      setText((old) => (old.trim() ? `${old.trim()} ${found.join(' ')}` : found.join(' ')));
-      setMessage({ type: 'ok', text: `AI đọc được ${found.length} số. Hãy đối chiếu với ảnh và sửa nếu cần trước khi lưu.` });
+      const { values: found, raw: answer } = await api.ocr(image, 'image/jpeg');
+      setRaw(answer);
+      if (found.length === 0) {
+        setMessage({ type: 'error', text: 'Không lọc được số nào từ câu trả lời của AI (xem bên dưới). Hãy chụp rõ hơn hoặc nhập tay.' });
+      } else {
+        setText((old) => (old.trim() ? `${old.trim()} ${found.join(' ')}` : found.join(' ')));
+        setMessage({ type: 'ok', text: `Lọc được ${found.length} số. Hãy đối chiếu với ảnh và sửa nếu cần trước khi lưu.` });
+      }
     } catch (e) {
       setMessage({ type: 'error', text: e.message });
     }
@@ -88,6 +105,18 @@ export default function Entry({ slip, onSaved, onCancel }) {
       </div>
 
       <label className="field">
+        Nhập tay từng số (gõ đủ 3 chữ số là tự thêm)
+        <input
+          className="single"
+          inputMode="numeric"
+          maxLength={3}
+          placeholder="201"
+          value={single}
+          onChange={onSingle}
+        />
+      </label>
+
+      <label className="field">
         Các số (mỗi số 3 chữ số, cách nhau bằng dấu cách hoặc xuống dòng)
         <textarea
           rows={6}
@@ -96,6 +125,13 @@ export default function Entry({ slip, onSaved, onCancel }) {
           onChange={(e) => setText(e.target.value)}
         />
       </label>
+
+      {raw && (
+        <details className="raw" open>
+          <summary>Câu trả lời của AI (đầy đủ)</summary>
+          <pre>{raw}</pre>
+        </details>
+      )}
 
       {message && <div className={`notice ${message.type}`}>{message.text}</div>}
       {invalid.length > 0 && <div className="notice error">Sai định dạng (phải đúng 3 chữ số): {invalid.join(', ')}</div>}
