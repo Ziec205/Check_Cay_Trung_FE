@@ -12,7 +12,10 @@ async function request(path, options = {}, timeoutMs = 30000) {
     throw new Error('Không kết nối được máy chủ. Máy chủ miễn phí có thể đang khởi động, hãy thử lại sau ít giây.');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Lỗi ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 404 && !data.error) throw new Error('Máy chủ không có chức năng này. Hãy tải lại ứng dụng để dùng bản mới.');
+    throw new Error(data.error || `Lỗi ${res.status}`);
+  }
   return data;
 }
 
