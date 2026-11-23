@@ -25,7 +25,6 @@ export const api = {
   updateSlip: (id, slip) => request(`/api/slips/${id}`, send('PUT', slip)),
   deleteSlip: (id) => request(`/api/slips/${id}`, { method: 'DELETE' }),
   deleteMonth: (month) => request(`/api/months/${month}`, { method: 'DELETE' }),
-  ocr: (image, mimeType) => request('/api/ocr', send('POST', { image, mimeType }), 90000),
   invoiceMonths: () => request('/api/invoices/months'),
   eggTypes: () => request('/api/invoices/egg-types'),
   invoices: (month) => request(`/api/invoices?month=${month}`),

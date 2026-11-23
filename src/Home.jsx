@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import { fmt0, fmt1, monthLabel } from './calc.js';
+import { fmt0, fmt1, fmtMoney, monthLabel } from './calc.js';
 import Breakdown from './Breakdown.jsx';
 
 export default function Home({ refreshKey, onOpenMonth, onNewEntry }) {
@@ -45,7 +45,7 @@ export default function Home({ refreshKey, onOpenMonth, onNewEntry }) {
     return (
       <section className="sheet paper margin empty">
         <h2>Chưa có số liệu</h2>
-        <p>Chụp ảnh trang sổ hoặc gõ các số cân để bắt đầu tháng đầu tiên.</p>
+        <p>Gõ các số cân trong sổ để bắt đầu tháng đầu tiên.</p>
         <button className="btn primary" onClick={onNewEntry}>Nhập số liệu</button>
       </section>
     );
@@ -81,6 +81,9 @@ export default function Home({ refreshKey, onOpenMonth, onNewEntry }) {
           <div><dt>Tổng cân</dt><dd>{fmt1(current.totalKg)} kg</dd></div>
           <div><dt>Kg nguyên</dt><dd>{fmt0(current.wholeKg)} kg</dd></div>
           <div><dt>Số lần nhập</dt><dd>{current.slipCount}</dd></div>
+          {current.leftoverAmount > 0 && (
+            <div><dt>Tiền trứng dư</dt><dd>{fmtMoney(current.leftoverAmount)}</dd></div>
+          )}
         </dl>
 
         <Breakdown s={current} />

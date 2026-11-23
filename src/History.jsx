@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import { dateLabel, fmt1, monthLabel, weekdayLabel } from './calc.js';
+import { dateLabel, fmt1, fmtInt, fmtMoney, monthLabel, weekdayLabel } from './calc.js';
 import Entry from './Entry.jsx';
 import Weights from './Weights.jsx';
 
@@ -68,6 +68,12 @@ export default function History({ month, setMonth, refreshKey, onChanged }) {
                 <span className="rem">còn {fmt1(s.remKg)} kg</span>
               </p>
             </div>
+            {s.leftoverPrice > 0 && (
+              <p className="leftover-calc">
+                <span>Trứng dư {fmt1(s.remKg)} kg × {fmtInt(s.leftoverPrice)} VND/kg</span>
+                <strong>{fmtMoney(s.leftoverAmount)}</strong>
+              </p>
+            )}
             <Weights values={s.values} />
             <div className="actions">
               <button className="btn" onClick={() => setEditing(s)}>Sửa</button>

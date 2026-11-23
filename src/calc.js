@@ -52,6 +52,19 @@ export const fmtMoney = (n) => `${fmtInt(n)} VND`;
 
 export const EGGS_PER_TREE = 300;
 
+// Tiền trứng dư: số kg dư × giá mỗi kg, làm tròn đến đồng (giống backend).
+export function leftoverAmount(kg, pricePerKg) {
+  if (!kg || !pricePerKg) return 0;
+  return Math.round((Math.round(kg * 10) * pricePerKg) / 10);
+}
+
+// "0,1" hoặc "0.1" -> 0.1; trả về NaN nếu không hợp lệ
+export function parseKg(text) {
+  const t = String(text || '').trim().replace(',', '.');
+  if (!/^\d+(\.\d)?$/.test(t)) return NaN;
+  return Number(t);
+}
+
 // Giờ hiện tại dạng "YYYY-MM-DDTHH:mm" cho ô chọn ngày giờ
 export function nowLocal() {
   const d = new Date();

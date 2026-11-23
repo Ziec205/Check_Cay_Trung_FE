@@ -1,38 +1,31 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { api } from './api.js';
-import { dateLabel, fmt1, isOdd, parseNumbers, summarize, todayStr } from './calc.js';
+import { dateLabel, fmt1, fmtInt, fmtMoney, isOdd, leftoverAmount, parseNumbers, summarize, todayStr } from './calc.js';
 import Breakdown from './Breakdown.jsx';
 import Weights from './Weights.jsx';
 import NumberInput from './NumberInput.jsx';
 
-// Thu nhỏ ảnh để tải nhanh và đỡ tốn quota Gemini.
-function resizeImage(file, max = 1600) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
-    };
-    img.onerror = () => reject(new Error('Không mở được ảnh'));
-    img.src = url;
-  });
+const PRICE_KEY = 'leftoverPrice';
+
+function loadLastPrice() {
+  try { return localStorage.getItem(PRICE_KEY) || ''; } catch { return ''; }
+}
+
+function saveLastPrice(v) {
+  try {
+    if (v) localStorage.setItem(PRICE_KEY, v);
+    else localStorage.removeItem(PRICE_KEY);
+  } catch { /* trình duyệt chặn lưu thì thôi */ }
 }
 
 export default function Entry({ slip, onSaved, onCancel }) {
   const [date, setDate] = useState(slip?.date || todayStr());
   const [text, setText] = useState(slip ? slip.values.join(' ') : '');
-  const [reading, setReading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
-  const [raw, setRaw] = useState('');
   const [single, setSingle] = useState('');
-  const fileRef = useRef(null);
+  // Giá trứng dư mỗi kg; lần nhập mới lấy lại giá đã dùng lần trước cho đỡ gõ
+  const [leftoverPrice, setLeftoverPrice] = useState(() => (slip ? String(slip.leftoverPrice || '') : loadLastPrice()));
 
   // Nhập tay từng số: đủ 3 chữ số thì tự thêm vào danh sách.
   const onSingle = (v) => {
@@ -47,36 +40,17 @@ export default function Entry({ slip, onSaved, onCancel }) {
   const { values, invalid } = useMemo(() => parseNumbers(text), [text]);
   const summary = useMemo(() => summarize(values), [values]);
   const oddCount = values.filter(isOdd).length;
-
-  const readImage = async (file) => {
-    if (!file) return;
-    setReading(true);
-    setMessage(null);
-    try {
-      const image = await resizeImage(file);
-      const { values: found, raw: answer } = await api.ocr(image, 'image/jpeg');
-      setRaw(answer);
-      if (found.length === 0) {
-        setMessage({ type: 'error', text: 'Không lọc được số nào từ câu trả lời của AI. Hãy chụp rõ hơn hoặc gõ tay.' });
-      } else {
-        setText((old) => (old.trim() ? `${old.trim()} ${found.join(' ')}` : found.join(' ')));
-        setMessage({ type: 'ok', text: `Đã điền ${found.length} số từ ảnh. Đối chiếu với sổ và sửa nếu cần trước khi lưu.` });
-      }
-    } catch (e) {
-      setMessage({ type: 'error', text: e.message });
-    }
-    setReading(false);
-    if (fileRef.current) fileRef.current.value = '';
-  };
+  const leftoverMoney = leftoverAmount(summary.remKg, Number(leftoverPrice || 0));
 
   const save = async () => {
     setSaving(true);
     setMessage(null);
     try {
-      if (slip) await api.updateSlip(slip.id, { date, values });
-      else await api.createSlip({ date, values });
+      const body = { date, values, leftoverPrice: Number(leftoverPrice || 0) };
+      if (slip) await api.updateSlip(slip.id, body);
+      else await api.createSlip(body);
+      saveLastPrice(leftoverPrice);
       setText('');
-      setRaw('');
       setMessage({ type: 'ok', text: `Đã lưu ${values.length} cây cho ngày ${dateLabel(date)}.` });
       onSaved?.();
     } catch (e) {
@@ -96,14 +70,6 @@ export default function Entry({ slip, onSaved, onCancel }) {
           <span className="field-label">Ngày cân</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-
-        <div className="field">
-          <span className="field-label">Đọc từ ảnh sổ</span>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => readImage(e.target.files?.[0])} />
-          <button className="btn" disabled={reading} onClick={() => fileRef.current?.click()}>
-            {reading ? 'AI đang đọc ảnh...' : 'Chụp hoặc chọn ảnh'}
-          </button>
-        </div>
 
         <label className="field">
           <span className="field-label">Thêm từng số</span>
@@ -136,23 +102,43 @@ export default function Entry({ slip, onSaved, onCancel }) {
         <span id="text-hint" className="hint">Mỗi số gồm 3 chữ số, cách nhau bằng dấu cách hoặc xuống dòng. 201 nghĩa là 20,1 kg.</span>
       </label>
 
+      <div className="field leftover-field">
+        <label className="field-label" htmlFor="leftover-price">Giá trứng dư mỗi kg</label>
+        <span className="affix">
+          <NumberInput
+            id="leftover-price"
+            className="text-input num-input"
+            value={leftoverPrice}
+            onChange={setLeftoverPrice}
+            format={fmtInt}
+            maxDigits={9}
+            placeholder="30,000"
+            aria-describedby="leftover-hint"
+          />
+          <span className="affix-unit">VND</span>
+        </span>
+        <span id="leftover-hint" className="hint">
+          Phần lẻ sau kg nguyên của mỗi cây, ví dụ 201 là 20 kg, dư 0,1 kg. Bỏ trống nếu chưa tính.
+        </span>
+        {values.length > 0 && (
+          <p className="leftover-calc">
+            <span>Dư {fmt1(summary.remKg)} kg × {fmtInt(leftoverPrice || 0)} VND/kg</span>
+            <strong>{fmtMoney(leftoverMoney)}</strong>
+          </p>
+        )}
+      </div>
+
       <div aria-live="polite">
         {message && <p className={`notice ${message.type}`}>{message.text}</p>}
         {invalid.length > 0 && <p className="notice error">Các số này không đủ 3 chữ số, hãy sửa lại: {invalid.join(', ')}</p>}
       </div>
-
-      {raw && (
-        <details className="raw">
-          <summary>Xem nguyên văn AI chép từ ảnh</summary>
-          <pre>{raw}</pre>
-        </details>
-      )}
 
       {values.length > 0 && (
         <section className="sheet preview" aria-labelledby="preview-title">
           <h3 id="preview-title" className="preview-title">
             <span className="tally-count small">{summary.count}</span> cây
             <span className="tally-rem inline">còn {fmt1(summary.remKg)} kg</span>
+            {leftoverMoney > 0 && <span className="leftover-money">= {fmtMoney(leftoverMoney)}</span>}
           </h3>
           {oddCount > 0 && (
             <p className="notice warn">Có {oddCount} số nằm ngoài khoảng thường gặp, đã gạch chân để bạn kiểm tra.</p>

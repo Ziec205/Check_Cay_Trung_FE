@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import {
-  EGGS_PER_TREE, dateLabel, dateTimeLabel, fmtInt, fmtMoney, monthLabel, nowLocal, weekdayLabel,
+  EGGS_PER_TREE, dateLabel, dateTimeLabel, fmt1, fmtInt, fmtMoney, leftoverAmount, monthLabel, nowLocal, parseKg,
+  weekdayLabel,
 } from './calc.js';
 import NumberInput from './NumberInput.jsx';
 
@@ -91,18 +92,82 @@ function LineEditor({ line, index, count, eggTypes, onChange, onRemove, autoFocu
   );
 }
 
+// Trứng dư bán theo kg, giá mỗi kg do người bán tự nhập. Bỏ trống cả hai nếu không có.
+function LeftoverEditor({ kg, price, onKg, onPrice }) {
+  const kgNum = parseKg(kg);
+  const kgBad = kg.trim() !== '' && !(kgNum > 0);
+  const half = (kg.trim() !== '') !== (price !== '');
+  return (
+    <fieldset className="line leftover-line">
+      <legend className="line-legend"><span>Trứng dư (tính theo kg)</span></legend>
+
+      <div className="field-pair">
+        <label className="field">
+          <span className="field-label">Số kg dư</span>
+          <span className="affix">
+            <input
+              className="text-input num-input"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={kg}
+              onChange={(e) => onKg(e.target.value.replace(/[^\d.,]/g, '').slice(0, 8))}
+              placeholder="0,1"
+              aria-invalid={kgBad || undefined}
+              enterKeyHint="next"
+            />
+            <span className="affix-unit">kg</span>
+          </span>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Giá mỗi kg</span>
+          <span className="affix">
+            <NumberInput
+              className="text-input num-input"
+              value={price}
+              onChange={onPrice}
+              format={fmtInt}
+              maxDigits={9}
+              placeholder="30,000"
+              enterKeyHint="done"
+            />
+            <span className="affix-unit">VND</span>
+          </span>
+        </label>
+      </div>
+
+      {kgBad && <p className="hint error-text">Số kg chỉ lấy một chữ số sau dấu phẩy, ví dụ 0,1 hoặc 1,3.</p>}
+      {!kgBad && half && <p className="hint">Nhập đủ số kg và giá mỗi kg, hoặc bỏ trống cả hai nếu không có trứng dư.</p>}
+
+      <p className="line-sum">
+        <span>{kgNum > 0 ? fmt1(kgNum) : 0} kg × {fmtInt(price || 0)} VND/kg</span>
+        <strong>{fmtMoney(leftoverAmount(kgNum > 0 ? kgNum : 0, Number(price || 0)))}</strong>
+      </p>
+    </fieldset>
+  );
+}
+
 function InvoiceForm({ invoice, eggTypes, onSaved, onCancel }) {
   const [customer, setCustomer] = useState(invoice?.customer || '');
   const [lines, setLines] = useState(() => (invoice ? invoice.lines.map(newLine) : [newLine()]));
   const [focusKey, setFocusKey] = useState(null);
   const [issuedAt, setIssuedAt] = useState(invoice?.issuedAt || nowLocal());
+  const [leftKg, setLeftKg] = useState(invoice?.leftover ? String(invoice.leftover.kg).replace('.', ',') : '');
+  const [leftPrice, setLeftPrice] = useState(invoice?.leftover ? String(invoice.leftover.pricePerKg) : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const trees = lines.reduce((s, l) => s + Number(l.trees || 0), 0);
   const eggs = lines.reduce((s, l) => s + lineEggs(l), 0);
-  const total = lines.reduce((s, l) => s + lineAmount(l), 0);
-  const canSave = customer.trim() && issuedAt && lines.every(lineReady) && !saving;
+  const leftKgNum = parseKg(leftKg);
+  const hasLeftover = leftKg.trim() !== '' || leftPrice !== '';
+  const leftoverOk = !hasLeftover || (leftKgNum > 0 && Number(leftPrice) > 0);
+  const leftoverMoney = hasLeftover && leftoverOk ? leftoverAmount(leftKgNum, Number(leftPrice)) : 0;
+  const total = lines.reduce((s, l) => s + lineAmount(l), 0) + leftoverMoney;
+  const canSave = customer.trim() && issuedAt && lines.every(lineReady) && leftoverOk && !saving;
 
   const addLine = () => {
     const l = newLine();
@@ -120,6 +185,7 @@ function InvoiceForm({ invoice, eggTypes, onSaved, onCancel }) {
         customer: customer.trim(),
         issuedAt,
         lines: lines.map((l) => ({ eggType: l.eggType.trim(), trees: Number(l.trees), pricePerEgg: Number(l.price) })),
+        leftover: hasLeftover ? { kg: leftKgNum, pricePerKg: Number(leftPrice) } : null,
       };
       const saved = invoice ? await api.updateInvoice(invoice.id, body) : await api.createInvoice(body);
       onSaved(saved);
@@ -179,6 +245,7 @@ function InvoiceForm({ invoice, eggTypes, onSaved, onCancel }) {
           />
         ))}
         <button type="button" className="btn add-line" onClick={addLine}>+ Thêm loại trứng</button>
+        <LeftoverEditor kg={leftKg} price={leftPrice} onKg={setLeftKg} onPrice={setLeftPrice} />
       </div>
 
       <section className="calc" aria-live="polite" aria-label="Thành tiền">
@@ -190,6 +257,12 @@ function InvoiceForm({ invoice, eggTypes, onSaved, onCancel }) {
           <span>Tổng số trứng</span>
           <span>{fmtInt(eggs)} quả</span>
         </p>
+        {leftoverMoney > 0 && (
+          <p className="calc-line">
+            <span>Trứng dư {fmt1(leftKgNum)} kg</span>
+            <span>{fmtMoney(leftoverMoney)}</span>
+          </p>
+        )}
         <p className="calc-total">{fmtMoney(total)}</p>
       </section>
 
@@ -232,12 +305,24 @@ function Receipt({ inv, onEdit, onNew, onBack, onDelete }) {
               </p>
             </li>
           ))}
+          {inv.leftover && (
+            <li className="receipt-item">
+              <div className="receipt-item-head">
+                <span className="receipt-item-name">Trứng dư</span>
+                <strong>{fmtMoney(inv.leftover.amount)}</strong>
+              </div>
+              <p className="receipt-item-calc">
+                {fmt1(inv.leftover.kg)} kg × {fmtMoney(inv.leftover.pricePerKg)}/kg
+              </p>
+            </li>
+          )}
         </ul>
 
         <table className="receipt-lines">
           <tbody>
             <tr><th scope="row">Tổng số cây</th><td>{fmtInt(inv.trees)} cây</td></tr>
             <tr><th scope="row">Tổng số trứng</th><td>{fmtInt(inv.eggs)} quả</td></tr>
+            {inv.leftover && <tr><th scope="row">Trứng dư</th><td>{fmt1(inv.leftover.kg)} kg</td></tr>}
           </tbody>
         </table>
 
